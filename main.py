@@ -13,8 +13,8 @@ def blend(img, overlay):
 
     result = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
 
-    for c in range(0, 3):
-        result[:, :, c] = (alpha_img * img[:, :, c] + alpha_overlay * overlay[:, :, c])
+    for channel in range(0, 3):
+        result[:, :, channel] = (alpha_img * img[:, :, channel] + alpha_overlay * overlay[:, :, channel])
 
     return result
 
@@ -22,17 +22,14 @@ def blend(img, overlay):
 def correct(img, points):
     assert len(points) == 4
 
-    h = img.shape[0]
-    w = img.shape[1]
-    print(h, w)
+    height = img.shape[0]
+    width = img.shape[1]
 
     src = np.float32(points)
-    dst = np.float32([(0, 0), (w, 0), (w, h), (0, h)])
+    dst = np.float32([(0, 0), (width, 0), (width, height), (0, height)])
 
     matrix = cv2.getPerspectiveTransform(src, dst)
-
-    wrapped = cv2.warpPerspective(img, matrix, (w, h))
-    cv2.imwrite('wrapped.jpg', wrapped)
+    wrapped = cv2.warpPerspective(img, matrix, (width, height))
 
     lab = cv2.cvtColor(wrapped, cv2.COLOR_BGR2LAB)
     l, _, _ = cv2.split(lab)
@@ -46,28 +43,26 @@ def correct(img, points):
     cl = ((cl / 255) ** 2) * 255  # enhance contrast
     return cl
 
-
-index = 0
-
-
 def mouse_callback(event, x, y, flags, param):
     del flags # unused
 
-    if event == cv2.EVENT_LBUTTONDOWN:
-        if not 'points' in param[index]:
-            param[index]['points'] = []
+    index = param['index']
+    images = param['images']
 
-        if len(param[index]['points']) >= 4:
+    if event == cv2.EVENT_LBUTTONDOWN:
+        if not 'points' in images[index]:
+            images[index]['points'] = []
+
+        if len(images[index]['points']) >= 4:
             return
 
-        param[index]['points'].append((x, y))
+        images[index]['points'].append((x, y))
     elif event == cv2.EVENT_RBUTTONDOWN:
-        if 'points' in param[index]:
-            param[index]['points'] = []
+        if 'points' in images[index]:
+            images[index]['points'] = []
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Show image or images in a folder")
+    parser = argparse.ArgumentParser(description="Show image or images in a folder")
     parser.add_argument("files", nargs='+')
     args = parser.parse_args()
 
@@ -85,25 +80,26 @@ def main():
         logging.error('No files specified!')
         sys.exit(1)
 
+    data = { 'images': images, 'index': 0 }
+
     cv2.namedWindow('App', flags=cv2.WINDOW_NORMAL)
-    cv2.setMouseCallback('App', mouse_callback, param=images)
+    cv2.setMouseCallback('App', mouse_callback, param=data)
 
     frame = None
     overlay = None
 
-    global index
-
     # get window property is there to detect window close, once it is closed
     # in will return -1, it doesn't matter which flag we will use
     while cv2.getWindowProperty('App', 0) >= 0:
-        print(index)
+        index = data['index']
+        images = data['images']
+
         if frame is None:
             frame_rgb = cv2.imread(images[index]['path'])
             frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2RGBA)
 
         overlay = np.zeros((frame.shape[0], frame.shape[1], 4), dtype=np.uint8)
         if 'points' in images[index]:
-            print(images[index]['points'])
             for point in images[index]['points']:
                 cv2.circle(overlay, point, 50, (0, 255, 0, 255), 50)
 
@@ -113,8 +109,7 @@ def main():
         if key == 27:
             break  # ESC
         elif key == 13:
-            # enter
-            # now we need to correct all images
+            # enter, now we need to correct all images
             for (k, v) in enumerate(images):
                 if 'points' in v and len(v['points']) == 4:
                     img = cv2.imread(v['path'])
@@ -123,11 +118,11 @@ def main():
             break
         elif (key == 2424832) or (key & 0xff == ord('[')):
             # left arrow key or '[' pressed
-            index = max(index - 1, 0)
+            data['index'] = max(data['index'] - 1, 0)
             frame = None
         elif (key == 2555904) or (key & 0xff == ord(']')):
             # right arrow key or ']' pressed
-            index = min(index + 1, len(images) - 1)
+            data['index'] = min(data['index'] + 1, len(images) - 1)
             frame = None
 
     cv2.destroyAllWindows()
