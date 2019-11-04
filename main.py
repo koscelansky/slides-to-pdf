@@ -22,19 +22,20 @@ class Settings:
         self.keep_images = args.keep_images
         self.image_dir = tempfile.mkdtemp('slides-to-pdf')
         # 4:3 aspect ratio with plenty of resolution
-        self.image_width = 3264
-        self.image_height = 2448
+        self.image_width = 1632
+        self.image_height = 1224
 
 SETTINGS = Settings()
 
 def blend(img, overlay):
+    """Takes two OpenCV images and merge them together, it will honor alpha."""
     alpha_overlay = overlay[:, :, 3] / 255.0
     alpha_img = 1.0 - alpha_overlay
 
     result = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
 
     for channel in range(0, 3):
-        result[:, :, channel] = (alpha_img * img[:, :, channel] + alpha_overlay * overlay[:, :, channel])
+        result[:, :, channel] = alpha_img * img[:, :, channel] + alpha_overlay * overlay[:, :, channel]
 
     return result
 
@@ -52,10 +53,10 @@ def correct(img, points):
     wrapped = cv2.warpPerspective(img, matrix, (width, height))
 
     lab = cv2.cvtColor(wrapped, cv2.COLOR_BGR2LAB)
-    l, _, _ = cv2.split(lab)
+    lightness, _, _ = cv2.split(lab)
 
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(16, 16))
-    cl = clahe.apply(l)
+    cl = clahe.apply(lightness)
 
     tr = 255 - cv2.threshold(255 - cl, 70, 255, cv2.THRESH_TOZERO)[1]
     cl = cv2.addWeighted(cl, 0.75, tr, 0.25, 0)
@@ -77,12 +78,13 @@ def process_images(images):
     
     for path in paths:
         pdf.add_page()
-        pdf.image(path, 0, 0)
+        pdf.image(path, 0, 0, SETTINGS.image_width, SETTINGS.image_height)
 
     pdf.output(SETTINGS.output, "F")
 
 
 def mouse_callback(event, x, y, flags, param):
+    """Callback function for OpenCV window."""
     del flags # unused
 
     index = param['index']
