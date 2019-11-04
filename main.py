@@ -2,10 +2,30 @@ import argparse
 import logging
 import os
 import sys
+import tempfile
+import shutil
 
 import cv2
+import fpdf
 import numpy as np
 
+class Settings:
+    def __init__(self):
+        parser = argparse.ArgumentParser(description="Show image or images in a folder")
+        parser.add_argument("--output", default='.\\merged.pdf')
+        parser.add_argument("--keep-images", action="store_true")
+        parser.add_argument("files", nargs='+')
+        args = parser.parse_args()
+
+        self.output = args.output
+        self.files = args.files
+        self.keep_images = args.keep_images
+        self.image_dir = tempfile.mkdtemp('slides-to-pdf')
+        # 4:3 aspect ratio with plenty of resolution
+        self.image_width = 3264
+        self.image_height = 2448
+
+SETTINGS = Settings()
 
 def blend(img, overlay):
     alpha_overlay = overlay[:, :, 3] / 255.0
@@ -43,6 +63,25 @@ def correct(img, points):
     cl = ((cl / 255) ** 2) * 255  # enhance contrast
     return cl
 
+def process_images(images):
+    paths = []
+
+    for (k, v) in enumerate(images):
+        if 'points' in v and len(v['points']) == 4:
+            img = cv2.imread(v['path'])
+            corrected = correct(img, v['points'])
+            paths.append(os.path.join(SETTINGS.image_dir, '{:04d}.jpg'.format(k)))
+            cv2.imwrite(paths[-1], corrected)
+
+    pdf = fpdf.FPDF('L', 'pt', (SETTINGS.image_height, SETTINGS.image_width))
+    
+    for path in paths:
+        pdf.add_page()
+        pdf.image(path, 0, 0)
+
+    pdf.output(SETTINGS.output, "F")
+
+
 def mouse_callback(event, x, y, flags, param):
     del flags # unused
 
@@ -62,12 +101,8 @@ def mouse_callback(event, x, y, flags, param):
             images[index]['points'] = []
 
 def main():
-    parser = argparse.ArgumentParser(description="Show image or images in a folder")
-    parser.add_argument("files", nargs='+')
-    args = parser.parse_args()
-
     images = []
-    for path in args.files:
+    for path in SETTINGS.files:
         if os.path.isdir(path):
             for root, _, files in os.walk(path):
                 images += [{'path': os.path.join(root, file)} for file in files]
@@ -110,11 +145,7 @@ def main():
             break  # ESC
         elif key == 13:
             # enter, now we need to correct all images
-            for (k, v) in enumerate(images):
-                if 'points' in v and len(v['points']) == 4:
-                    img = cv2.imread(v['path'])
-                    corrected = correct(img, v['points'])
-                    cv2.imwrite('.\\{:04d}.jpg'.format(k), corrected)
+            process_images(images)
             break
         elif (key == 2424832) or (key & 0xff == ord('[')):
             # left arrow key or '[' pressed
@@ -126,6 +157,11 @@ def main():
             frame = None
 
     cv2.destroyAllWindows()
+
+    if not SETTINGS.keep_images:
+        shutil.rmtree(SETTINGS.image_dir)
+    else:
+        print(f'Images are available at { SETTINGS.image_dir }.')
 
 if __name__ == '__main__':
     main()
