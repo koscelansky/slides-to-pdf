@@ -9,6 +9,7 @@ import cv2
 import fpdf
 import numpy as np
 
+
 class Settings:
     def __init__(self):
         parser = argparse.ArgumentParser(description="Show image or images in a folder")
@@ -18,14 +19,29 @@ class Settings:
         args = parser.parse_args()
 
         self.output = args.output
-        self.files = args.files
+        self.files = self._list_files(args.files)
         self.keep_images = args.keep_images
         self.image_dir = tempfile.mkdtemp('slides-to-pdf')
         # 4:3 aspect ratio with plenty of resolution
         self.image_width = 1632
         self.image_height = 1224
 
+    def _list_files(self, paths):
+        """Takes a list of paths and enumerate all files within them, recursively"""
+        result = []
+        for path in paths:
+            if os.path.isdir(path):
+                for root, _, files in os.walk(path):
+                    result += [os.path.join(root, file) for file in files]
+            elif os.path.isfile(path):
+                result.append(path)
+            else:
+                logging.warning('Object %s is not a directory, nor a file!', path)
+        return result
+
+
 SETTINGS = Settings()
+
 
 def blend(img, overlay):
     """Takes two OpenCV images and merge them together, it will honor alpha."""
@@ -64,6 +80,7 @@ def correct(img, points):
     cl = ((cl / 255) ** 2) * 255  # enhance contrast
     return cl
 
+
 def process_images(images):
     paths = []
 
@@ -75,7 +92,7 @@ def process_images(images):
             cv2.imwrite(paths[-1], corrected)
 
     pdf = fpdf.FPDF('L', 'pt', (SETTINGS.image_height, SETTINGS.image_width))
-    
+
     for path in paths:
         pdf.add_page()
         pdf.image(path, 0, 0, SETTINGS.image_width, SETTINGS.image_height)
@@ -84,8 +101,8 @@ def process_images(images):
 
 
 def mouse_callback(event, x, y, flags, param):
-    """Callback function for OpenCV window."""
-    del flags # unused
+    """Callback function for OpenCV window mouse event."""
+    del flags  # unused
 
     index = param['index']
     images = param['images']
@@ -102,22 +119,18 @@ def mouse_callback(event, x, y, flags, param):
         if 'points' in images[index]:
             images[index]['points'] = []
 
+
 def main():
+    """Main entry point. It will establish the gui and govern the process of images correction."""
     images = []
     for path in SETTINGS.files:
-        if os.path.isdir(path):
-            for root, _, files in os.walk(path):
-                images += [{'path': os.path.join(root, file)} for file in files]
-        elif os.path.isfile(path):
-            images[path] = {'path': path}
-        else:
-            logging.warning('Object %s is not a direcotry, nor a file!', path)
+        images.append({'path': path})
 
     if len(images) == 0:
         logging.error('No files specified!')
         sys.exit(1)
 
-    data = { 'images': images, 'index': 0 }
+    data = {'images': images, 'index': 0}
 
     cv2.namedWindow('App', flags=cv2.WINDOW_NORMAL)
     cv2.setMouseCallback('App', mouse_callback, param=data)
@@ -164,6 +177,7 @@ def main():
         shutil.rmtree(SETTINGS.image_dir)
     else:
         print(f'Images are available at { SETTINGS.image_dir }.')
+
 
 if __name__ == '__main__':
     main()
