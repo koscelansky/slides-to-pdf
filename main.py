@@ -139,12 +139,18 @@ start.
 
 If you wish to exit the application at any time you can press ESC.""")
 
+def keep_running():
+    """Return true if the application window is not closed. It is not very
+    accurate, since we depend on something not completely related, but it is
+    the best we have in OpenCV alone.
+    """
+    # get window property is there to detect window close, once it is closed
+    # in will return -1, it doesn't matter which flag we will use
+    return cv2.getWindowProperty('App', 0) >= 0
 
 def main():
     """Main entry point. It will establish the gui and govern the process of images correction."""
-    images = []
-    for path in SETTINGS.files:
-        images.append({'path': path})
+    images = [{'path': path} for path in SETTINGS.files]
 
     if len(images) == 0:
         logging.error('No files specified!')
@@ -160,9 +166,7 @@ def main():
 
     print_guide()
 
-    # get window property is there to detect window close, once it is closed
-    # in will return -1, it doesn't matter which flag we will use
-    while cv2.getWindowProperty('App', 0) >= 0:
+    while keep_running():
         index = data['index']
         images = data['images']
 
