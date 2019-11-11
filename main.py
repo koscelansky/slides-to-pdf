@@ -14,11 +14,12 @@ import numpy as np
 
 class Settings:
     """Class encapsulating all cli parameters and more."""
+
     def __init__(self):
-        parser = argparse.ArgumentParser(description="Show image or images in a folder")
-        parser.add_argument("--output", default='.\\merged.pdf')
-        parser.add_argument("--keep-images", action="store_true")
-        parser.add_argument("files", nargs='+')
+        parser = argparse.ArgumentParser(description='Correct image or images and create pdf.')
+        parser.add_argument('--output', default='.\\merged.pdf', help='output file location')
+        parser.add_argument('--keep-images', action='store_true', help='if selected, intermediate images kept on disk')
+        parser.add_argument('files', nargs='+', help='list of files and/or directories to process')
         args = parser.parse_args()
 
         self.output = args.output
@@ -139,6 +140,7 @@ start.
 
 If you wish to exit the application at any time you can press ESC.""")
 
+
 def keep_running():
     """Return true if the application window is not closed. It is not very
     accurate, since we depend on something not completely related, but it is
@@ -147,6 +149,7 @@ def keep_running():
     # get window property is there to detect window close, once it is closed
     # in will return -1, it doesn't matter which flag we will use
     return cv2.getWindowProperty('App', 0) >= 0
+
 
 def main():
     """Main entry point. It will establish the gui and govern the process of images correction."""
