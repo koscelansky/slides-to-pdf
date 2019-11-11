@@ -53,7 +53,7 @@ def blend(img, overlay):
 
     result = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
 
-    for channel in range(0, 3):
+    for channel in range(3):
         result[:, :, channel] = alpha_img * img[:, :, channel] + alpha_overlay * overlay[:, :, channel]
 
     return result
