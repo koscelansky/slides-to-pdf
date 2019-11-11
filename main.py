@@ -1,3 +1,5 @@
+""" Simple script for correcting images (mainly slides) and converting to pdf."""
+
 import argparse
 import logging
 import os
@@ -11,6 +13,7 @@ import numpy as np
 
 
 class Settings:
+    """Class encapsulating all cli parameters and more."""
     def __init__(self):
         parser = argparse.ArgumentParser(description="Show image or images in a folder")
         parser.add_argument("--output", default='.\\merged.pdf')
@@ -57,6 +60,7 @@ def blend(img, overlay):
 
 
 def correct(img, points):
+    """Takes image and four points, it will correct the perspective and enhance contrast."""
     assert len(points) == 4
 
     height = img.shape[0]
@@ -72,22 +76,23 @@ def correct(img, points):
     lightness, _, _ = cv2.split(lab)
 
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(16, 16))
-    cl = clahe.apply(lightness)
+    enhanced = clahe.apply(lightness)
 
-    tr = 255 - cv2.threshold(255 - cl, 70, 255, cv2.THRESH_TOZERO)[1]
-    cl = cv2.addWeighted(cl, 0.75, tr, 0.25, 0)
+    thresholded = 255 - cv2.threshold(255 - enhanced, 70, 255, cv2.THRESH_TOZERO)[1]
+    enhanced = cv2.addWeighted(enhanced, 0.75, thresholded, 0.25, 0)
 
-    cl = ((cl / 255) ** 2) * 255  # enhance contrast
-    return cl
+    enhanced = ((enhanced / 255) ** 2) * 255  # enhance contrast
+    return enhanced
 
 
 def process_images(images):
+    """Go through all images, correct them and save to pdf."""
     paths = []
 
-    for (k, v) in enumerate(images):
-        if 'points' in v and len(v['points']) == 4:
-            img = cv2.imread(v['path'])
-            corrected = correct(img, v['points'])
+    for (k, val) in enumerate(images):
+        if 'points' in val and len(val['points']) == 4:
+            img = cv2.imread(val['path'])
+            corrected = correct(img, val['points'])
             paths.append(os.path.join(SETTINGS.image_dir, '{:04d}.jpg'.format(k)))
             cv2.imwrite(paths[-1], corrected)
 
@@ -120,6 +125,21 @@ def mouse_callback(event, x, y, flags, param):
             images[index]['points'] = []
 
 
+def print_guide():
+    """Print the usage of the gui"""
+    print("""
+Images are open in window, you can scroll through them by using arrow keys, or
+alternatively, by using "[" for left and "]" for right. Use your mouse to
+select four points where corners of the slides are. Start with top left and
+follow in clockwise order. It is crucial to use this order, otherwise the
+perspective correction will not work. If you made a mistake, just press right
+mouse button, it will clear the selection and you can select the points one
+more time. When you processed all images just hit Enter and the processing will
+start.
+
+If you wish to exit the application at any time you can press ESC.""")
+
+
 def main():
     """Main entry point. It will establish the gui and govern the process of images correction."""
     images = []
@@ -137,6 +157,8 @@ def main():
 
     frame = None
     overlay = None
+
+    print_guide()
 
     # get window property is there to detect window close, once it is closed
     # in will return -1, it doesn't matter which flag we will use
