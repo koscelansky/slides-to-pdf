@@ -74,16 +74,17 @@ def correct(img, points):
     wrapped = cv2.warpPerspective(img, matrix, (width, height))
 
     lab = cv2.cvtColor(wrapped, cv2.COLOR_BGR2LAB)
-    lightness, _, _ = cv2.split(lab)
+    lightness, color_a, color_b = cv2.split(lab)
 
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(16, 16))
     enhanced = clahe.apply(lightness)
 
-    thresholded = 255 - cv2.threshold(255 - enhanced, 70, 255, cv2.THRESH_TOZERO)[1]
+    thresholded = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     enhanced = cv2.addWeighted(enhanced, 0.75, thresholded, 0.25, 0)
 
-    enhanced = ((enhanced / 255) ** 2) * 255  # enhance contrast
-    return enhanced
+    merged = cv2.merge([enhanced, color_a, color_b])
+
+    return cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
 
 
 def process_images(images):
@@ -95,7 +96,9 @@ def process_images(images):
             img = cv2.imread(val['path'])
             corrected = correct(img, val['points'])
             paths.append(os.path.join(SETTINGS.image_dir, '{:04d}.jpg'.format(k)))
-            cv2.imwrite(paths[-1], corrected)
+            
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
+            cv2.imwrite(paths[-1], corrected, encode_param)
 
     pdf = fpdf.FPDF('L', 'pt', (SETTINGS.image_height, SETTINGS.image_width))
 
@@ -190,6 +193,7 @@ def main():
         elif key == 13:
             # enter, now we need to correct all images
             process_images(images)
+            print(f'Merged pdf is available at { os.path.abspath(SETTINGS.output) }')
             break
         elif (key == 2424832) or (key & 0xff == ord('[')):
             # left arrow key or '[' pressed
